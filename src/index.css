@@ -12,14 +12,28 @@ body{
 }
 
 .title {
-  margin: 10px auto; 
   width: 300px;
   text-align: center;
+  position: fixed;
+  width: 100%;
+  padding: 10px;
+  top: 0px;
+  left: 0px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 canvas {
   opacity: 0;
   touch-action: none;
+  animation: fade-in 0.5s ease 0.25s forwards;
 }
 
 * {
