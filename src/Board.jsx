@@ -12,14 +12,14 @@ export function Board(){
   useEffect( () => {
     if(texture) {
       texture.wrapS = texture.wrapT = RepeatWrapping
-      texture.repeat.set(8, 8);
+      texture.repeat.set(80, 80);
       texture.anisotropy = 16;
     }
   },[texture])
 
   return <group>
     <mesh rotation={[-Math.PI/2,0,0]} receiveShadow={true}>
-      <planeGeometry args={[100,100]} />
+      <planeGeometry args={[1000,1000]} />
       <meshStandardMaterial map={texture}  />
     </mesh>
   </group>

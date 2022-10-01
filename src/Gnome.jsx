@@ -2,9 +2,8 @@ import { useFBX,useAnimations } from '@react-three/drei'
 import { useEffect,useState,useMemo, forwardRef } from 'react'
 import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 
-import gnomeFBXUrl from './assets/gnome_skin_idle1.fbx'
-import idleFBXUrl from './assets/gnome_skin_idle1.fbx'
-import walkFBXUrl from './assets/gnome_walking.fbx'
+import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
+import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
 
 
 // TODO Reference https://codesandbox.io/s/react-three-fiber-wildlife-nrbnq?file=/src/Model.js
@@ -13,7 +12,7 @@ export const Gnome = forwardRef(({position},ref) => {
   const gnome = useMemo(() => SkeletonUtils.clone(scene),[scene])
   const [animations] = useState(() => {
     const clips = [
-      useFBX(idleFBXUrl).animations[0],
+      scene.animations[0],
       useFBX(walkFBXUrl).animations[0],
     ]
     clips[0].name = 'idle'
@@ -24,8 +23,8 @@ export const Gnome = forwardRef(({position},ref) => {
   console.log(actions)
 
   useEffect(() => {
-    actions.walk?.play()
-    return () => actions.walk?.reset()
+    actions.idle?.play()
+    return () => actions.idle?.reset()
   },[gnome])
 
   return <group name="gnome" position={position}>
