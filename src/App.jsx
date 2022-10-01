@@ -1,39 +1,45 @@
-import { useEffect,useState } from 'react'
+import { useEffect,useState,useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls,Center } from '@react-three/drei'
-import { Gnome } from './Gnome'
 import { Board } from './Board'
+import { Entities } from './Entities'
 import './App.css'
+import { newGameWorld,createPipeline,spawnGnome, movementQuery } from './Game'
 
 function App() {
-  const [counter,setCounter] = useState(0)
   const text=['Something','Happens','Every','10','Seconds']
+  const world = useMemo(() => newGameWorld())
+  const pipeline = useMemo(() => createPipeline())
+
+  useEffect( () => {
+    if(movementQuery(world).length==0){
+      for(let i=0;i<25;i++){
+        const x = (i%5 - 2.5) * 5 
+        const z = (Math.floor(i/5) - 2.5) * 5
+        spawnGnome(x,z,world)
+      }
+    }
+  },[world])
 
   useEffect( () => {
     const interval = setInterval(()=>{
-      setCounter((counter+1)%text.length)
-    },2000)
+      pipeline(world) 
+      // TODO refactor this so we update gnome positions in useFrame via movementQuery
+    },1000/60)
     return () => clearInterval(interval)
-  })
-
-  const gnomes = [...Array(25).keys()].map( i => {
-    const x = (i%5 - 2.5) * 10
-    const z = (Math.floor(i/5) - 2.5) * 10
-    return <Gnome key={i} position={[x,0,z]} />
   })
 
   return (
     <>
       <Canvas camera={{ position: [150, 100, 200], near: 5, far: 5000, fov: 12 }}>
         <ambientLight intensity={0.1} />
-        <directionalLight color="#eeeeff" position={[0, 20, 20]}  />
+        <directionalLight color="#eeeeff" position={[0, 20, 20]} shadow={true} />
         <Board />
-        {gnomes}
+        <Entities world={world} />
         <OrbitControls />
       </Canvas>
       <div className="title">
         <h1>Ludum Dare 51</h1>
-        {<div className="pulse">{text[counter]}</div>}
       </div>
     </>
   )

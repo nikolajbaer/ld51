@@ -3,22 +3,24 @@ import { useLoader } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { RepeatWrapping, TextureLoader } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
+import grassNormalTextureUrl from './assets/tex/grass_normal.png'
 
 export function Board(){
-  const colorMap = useLoader(TextureLoader, grassTextureUrl)
+  const texture = useLoader(TextureLoader, grassTextureUrl)
+  //const normal = useLoader(TextureLoader, grassNormalTextureUrl)
 
   useEffect( () => {
-    if(colorMap) {
-      colorMap.wrapS = colorMap.wrapT = RepeatWrapping
-      colorMap.repeat.set(8, 8);
-      colorMap.anisotropy = 16;
+    if(texture) {
+      texture.wrapS = texture.wrapT = RepeatWrapping
+      texture.repeat.set(8, 8);
+      texture.anisotropy = 16;
     }
-  },[colorMap])
+  },[texture])
 
   return <group>
-    <mesh rotation={[-Math.PI/2,0,0]}>
+    <mesh rotation={[-Math.PI/2,0,0]} receiveShadow={true}>
       <planeGeometry args={[100,100]} />
-      <meshStandardMaterial map={colorMap} />
+      <meshStandardMaterial map={texture}  />
     </mesh>
   </group>
 }
