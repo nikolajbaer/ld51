@@ -2,6 +2,7 @@ import { useEffect,useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls,Center } from '@react-three/drei'
 import { Gnome } from './Gnome'
+import { Board } from './Board'
 import './App.css'
 
 function App() {
@@ -15,15 +16,20 @@ function App() {
     return () => clearInterval(interval)
   })
 
+  const gnomes = [...Array(25).keys()].map( i => {
+    const x = (i%5 - 2.5) * 10
+    const z = (Math.floor(i/5) - 2.5) * 10
+    return <Gnome key={i} position={[x,0,z]} />
+  })
+
   return (
     <>
-      <Canvas camera={{ position: [-40, 45, -25], near: 5, far: 500, fov: 12 }}>
-        <ambientLight intensity={0.5} />
+      <Canvas camera={{ position: [150, 100, 200], near: 5, far: 5000, fov: 12 }}>
+        <ambientLight intensity={0.1} />
         <directionalLight color="#eeeeff" position={[0, 20, 20]}  />
-        <Center>
-          <Gnome />         
-        </Center>
-        <OrbitControls /> 
+        <Board />
+        {gnomes}
+        <OrbitControls />
       </Canvas>
       <div className="title">
         <h1>Ludum Dare 51</h1>
