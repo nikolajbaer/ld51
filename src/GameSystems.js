@@ -14,7 +14,7 @@ export const Velocity = defineComponent(Vector3)
 
 export const movementQuery = defineQuery([Position, Velocity])
 
-const movementSystem = (world) => {
+export const movementSystem = (world) => {
   const { time: { delta } } = world
   const ents = movementQuery(world)
   for (let i = 0; i < ents.length; i++) {
@@ -26,7 +26,7 @@ const movementSystem = (world) => {
   return world
 }
 
-const timeSystem = world => {
+export const timeSystem = world => {
   const { time } = world
   const now = performance.now()
   const delta = now - time.then
@@ -47,12 +47,3 @@ export const spawnGnome = (x,z,world) => {
   return eid
 }
 
-export const newGameWorld = () => {
-  const world = createWorld()
-  world.time = { delta: 0, elapsed: 0, then: performance.now() }
-  return world 
-}
-
-export const createPipeline = () => {
-  return pipe(movementSystem, timeSystem)
-}

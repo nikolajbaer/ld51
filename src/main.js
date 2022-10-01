@@ -1,14 +1,16 @@
 import './index.css'
-import { Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Fog } from 'three'
+import { Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
-import { newGameWorld,createPipeline,spawnGnome,movementQuery,Position } from './Game'
+import { createWorld,pipe } from 'bitecs';
+import { spawnGnome,movementQuery,Position,movementSystem,timeSystem, Velocity } from './GameSystems'
 
 const models = new Map() 
+const mixers = new Map()
 
 function create_ground_and_lights(scene){
   // Create Ground / Lighting
@@ -30,17 +32,30 @@ function create_ground_and_lights(scene){
 }
 
 function load_model(loader,name,url,animations){
-  return loader.load( url, (scene) => {
-    console.log("Setting model for ",name)
-    models.set(name,{'scene':scene,'animations':{}})
-    // TODO load animation
+  loader.load( url, (scene) => {
+    const model = {'scene':scene,'animations':{}} 
+    models.set(name,model)
+    animations.forEach( ({name,url}) => {
+      loader.load(url, ({animations}) => {
+        model.animations[name] = animations[0]
+      })
+    })
   })
 }
 
 function obj3d_from_model(name,has_skeleton){
-  console.log("Creating obj3d for ",name)
   if(has_skeleton){
-    const obj = SkeletonUtils.clone(models.get(name).scene)
+    const model = models.get(name)
+    const obj = SkeletonUtils.clone(model.scene)
+    obj.actions = {}
+    const mixer = new AnimationMixer(obj)
+    obj.actions.idle = mixer.clipAction(model.scene.animations[0],obj)
+
+    Object.keys(model.animations).map( key => {
+      const action = mixer.clipAction(model.animations[key])
+      obj.actions[key] = action
+    })
+    mixers.set(obj.uuid,mixer)
     return obj
   }
   const obj = models.get(name).scene.clone()
@@ -53,10 +68,14 @@ function spawn_gnomes(count,scene,world,entity_to_object3d){
     const x = (i%5 - 2.5) * 5 
     const z = (Math.floor(i/5) - 2.5) * 5
     const eid = spawnGnome(x,z,world)
-    const gnome = obj3d_from_model("gnome",true)
-    gnome.scale.x=0.01
-    gnome.scale.y=0.01
-    gnome.scale.z=0.01
+    const gnome_obj = obj3d_from_model("gnome",true)
+    const gnome = new Group()
+    gnome_obj.scale.x=0.01
+    gnome_obj.scale.y=0.01
+    gnome_obj.scale.z=0.01
+    gnome_obj.rotation.y =0 
+    gnome.add(gnome_obj)
+    gnome_obj.actions.walk.play()
     entity_to_object3d.set(eid,gnome)
     scene.add(gnome)
   }
@@ -74,6 +93,7 @@ function init(){
   const renderer = new WebGLRenderer()
   renderer.setSize( window.innerWidth, window.innerHeight )
   document.getElementById('root').appendChild( renderer.domElement )
+  const clock = new Clock();
   // debug
   window.scene = scene
   window.camera = camera
@@ -85,9 +105,22 @@ function init(){
   const controls = new OrbitControls(camera,renderer.domElement)
 
   // Init Game ECS
-  const world = newGameWorld()
-  const pipeline = createPipeline()
+  const world = createWorld()
+  world.time = { delta: 0, elapsed: 0, then: performance.now() }
   const entity_to_object3d = new Map() // eid to Object3d
+  const renderSystem = (world) => {
+    movementQuery(world).forEach( (eid) => {
+      const obj3d = entity_to_object3d.get(eid)
+      if(obj3d){
+        obj3d.position.x = Position.x[eid]
+        obj3d.position.z = Position.z[eid]
+        if(Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
+          obj3d.lookAt(new Vector3(obj3d.position.x + Velocity.x[eid],0,obj3d.position.z+Velocity.z[eid]))
+        }
+      }
+    })
+  }
+  const pipeline = pipe(timeSystem,movementSystem,renderSystem)
 
   // Load FBX Models
   const manager = new LoadingManager()
@@ -96,7 +129,7 @@ function init(){
     spawn_gnomes(25,scene,world,entity_to_object3d)
   }
   const loader = new FBXLoader(manager)
-  load_model(loader,'gnome',gnomeFBXUrl,[])
+  load_model(loader,'gnome',gnomeFBXUrl,[{name:'walk',url:walkFBXUrl}])
 
   // Resize Handler
   window.addEventListener( 'resize', () => {
@@ -107,14 +140,11 @@ function init(){
 
   // Animation Loop
   const animate = () => {
+    const delta = clock.getDelta(); 
+    for(let mixer of mixers.values()){
+      mixer.update(delta)
+    }
     pipeline(world)
-    movementQuery(world).forEach( (eid) => {
-      const obj3d = entity_to_object3d.get(eid)
-      if(obj3d){
-        obj3d.position.x = Position.x[eid]
-        obj3d.position.z = Position.z[eid]
-      }
-    })
   	requestAnimationFrame( animate )
     controls.update()
   	renderer.render( scene, camera )
