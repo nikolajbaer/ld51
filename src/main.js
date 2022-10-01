@@ -1,5 +1,5 @@
 import './index.css'
-import { Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager } from 'three'
+import { Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Fog } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
@@ -97,6 +97,13 @@ function init(){
   }
   const loader = new FBXLoader(manager)
   load_model(loader,'gnome',gnomeFBXUrl,[])
+
+  // Resize Handler
+  window.addEventListener( 'resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+  }, false );
 
   // Animation Loop
   const animate = () => {
