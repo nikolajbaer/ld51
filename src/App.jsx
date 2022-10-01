@@ -1,6 +1,7 @@
 import { useEffect,useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls,Center } from '@react-three/drei'
+import { Gnome } from './Gnome'
 import './App.css'
 
 function App() {
@@ -19,10 +20,9 @@ function App() {
       <Canvas camera={{ position: [-40, 45, -25], near: 5, far: 500, fov: 12 }}>
         <ambientLight intensity={0.5} />
         <directionalLight color="#eeeeff" position={[0, 20, 20]}  />
-        <mesh>
-          <boxGeometry args={[1,1,1]} />
-          <meshStandardMaterial color="blue" />
-        </mesh>
+        <Center>
+          <Gnome />         
+        </Center>
         <OrbitControls /> 
       </Canvas>
       <div className="title">
