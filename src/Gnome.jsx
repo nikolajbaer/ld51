@@ -1,9 +1,9 @@
 import { useFBX,useAnimations } from '@react-three/drei'
 import { useEffect } from 'react'
-import gnomeFBXurl from './assets/gnome_mixamo_dancing.fbx'
+import gnomeFBXUrl from './assets/gnome_mixamo_guitar.fbx'
 
 export function Gnome(){
-  const gnome = useFBX(gnomeFBXurl)
+  const gnome = useFBX(gnomeFBXUrl)
   console.log(gnome)
   gnome.animations[0].name = "dancing"
   const { actions, ref } = useAnimations(gnome.animations)
