@@ -1,0 +1,14 @@
+services:
+  node:
+    ports:
+      - "8008:8008"
+    command: "npm run dev"
+    <<: &COMMON
+      image: "node:18"
+      user: "node"
+      working_dir: /home/node/app
+      environment:
+        - NODE_ENV=development
+      volumes:
+        - ./:/home/node/app
+
