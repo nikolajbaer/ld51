@@ -44,6 +44,7 @@ export const spawnGnome = (x,z,world) => {
   Position.z[eid] = z 
   Velocity.x[eid] = Math.random()/1000
   Velocity.z[eid] = Math.random()/1000
+  return eid
 }
 
 export const newGameWorld = () => {
