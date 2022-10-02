@@ -32,10 +32,10 @@ export const movementSystem = (world) => {
     Position.y[eid] += Velocity.y[eid] * delta
     Position.z[eid] += Velocity.z[eid] * delta
     // Rotate in direction of movement
-    if(Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
-      const dot = Velocity.x[eid]
-      const det = Velocity.z[eid]
-      Rotation.y[eid] = Math.atan2(dot,det)
+    if(Math.abs(Velocity.x[eid]) > 0 && Math.abs(Velocity.z[eid]) > 0){
+      const dot = Velocity.z[eid]
+      const det = Velocity.x[eid]
+      Rotation.y[eid] = Math.atan2(det,dot)
     }
   }
   return world
@@ -77,7 +77,6 @@ export const spawnGnome = (x,z,world) => {
   addComponent(world, Position, eid)
   addComponent(world, Velocity, eid)
   addComponent(world, Rotation, eid)
-  addComponent(world, Selected, eid)
   Position.x[eid] = x
   Position.z[eid] = z 
   Velocity.x[eid] = 0
