@@ -7,6 +7,7 @@ import {
   addComponent,
   pipe,
   removeComponent,
+  removeEntity,
 } from 'bitecs'
 
 import { Vector3 } from 'three'
@@ -18,12 +19,20 @@ export const Rotation = defineComponent({y:Types.f32})
 export const Selected = defineComponent()
 export const MovementTarget = defineComponent(Vec3)
 export const AttackTarget = defineComponent({y:Types.eid})
-export const Body = defineComponent({r:Types.f32,t:Types.ui8})
+export const Fighter = defineComponent({d:Types.f32,rest:Types.f32,rate:Types.f32,team:Types.ui8})
+export const Body = defineComponent({r:Types.f32,t:Types.ui8}) // mask and cat correspond to fixture filter/category in Planck
+export const Hit = defineComponent({v:Types.eid})
+export const Health = defineComponent({h:Types.f32})
+export const Mob = defineComponent()
+export const Gnome = defineComponent()
+export const TriggerAnimation = defineComponent({a:Types.ui8})
 
 export const movementQuery = defineQuery([Position,Rotation])
 export const renderQuery = defineQuery([Position,Rotation])
 export const selectedQuery = defineQuery([Selected])
 export const bodyQuery = defineQuery([Position,Body])
+const fighterQuery = defineQuery([Fighter])
+const damageQuery = defineQuery([Hit,Health,Fighter])
 const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
 
 // TODO use planck to operate movement with collisions
@@ -40,31 +49,76 @@ export const movementSystem = (world) => {
     let body = plBodyMap.get(eid)
     if(body==undefined){
       body = plWorld.createBody({type:PL_BODY_TYPES[Body.t[eid]],position:Vec2(Position.x[eid],Position.z[eid]),angle:Rotation.y[eid]})
-      body.createFixture(pl.Circle(Body.r[eid]))
+      body.eid = eid
+      const fixture = pl.Circle(Body.r[eid])
+      body.createFixture(fixture)
       plBodyMap.set(eid,body)
     }
 
     const pos = body.getPosition()
     Position.x[eid] = pos.x
     Position.z[eid] = pos.y 
-    Rotation.y[eid] = body.getAngle()
+    // handle rotation based on where unit is going
+    //Rotation.y[eid] = body.getAngle()
 
     // Rotate in direction of movement
-/*
-    if(Math.abs(Velocity.x[eid]) > 0 && Math.abs(Velocity.z[eid]) > 0){
-      const dot = Velocity.z[eid]
-      const det = Velocity.x[eid]
+    const vel = body.getLinearVelocity()
+    if(Math.abs(vel.x) > 0 && Math.abs(vel.y) > 0){
+      const dot = vel.y
+      const det = vel.x
       Rotation.y[eid] = Math.atan2(det,dot)
     }
-*/
   }
   plWorld.step(1/60,10,8)
   plWorld.clearForces()
 
   for (let c = plWorld.getContactList(); c; c = c.getNext()) {
-    // What kind of contacts do we want to monitor?
+    const eid_a = c.getFixtureA().eid
+    const eid_b = c.getFixtureB().eid
+    // if we are contacting enemies
+    // last contact "wins"
+    if(Fighter.team[eid_a] != Fighter.team[eid_b]){
+      addComponent(world, Hit, eid_a)
+      Hit.v[eid] = eid_b
+      addComponent(world, Hit, eid_b)
+      Hit.v[eid] = eid_a
+    }
   }
+  return world
+}
 
+export const damageSystem = (world) => {
+  const { time: { delta } } = world
+  const ents = damageQuery(world)
+  for(let i=0;i<ents.length;i++){
+    const eid = ents[i]
+    if(Fighter.rest[eid] <= 0){
+      const eid_victim = Hit.v[eid]
+      removeComponent(world, Hit, eid)
+      // Apply Damage
+      Health[eid_victim] -= Fighter.d[eid]
+      if(Health[eid_victim] <= 0){
+        // Death
+        addComponent(world,TriggerAnimation,eid_victim) 
+        TriggerAnimation.a[eid_victim] = 2 // die
+      }else{
+        addComponent(world,TriggerAnimation,eid_victim) 
+        TriggerAnimation.a[eid_victim] = 1 // hit
+      }
+      addComponent(world,TriggerAnimation,eid_victim) 
+      TriggerAnimation.a[eid_victim] = 0 // attack
+      // reset rate of attack counter
+      Fighter.rest[eid] = Fighter.rate[eid]
+    }
+  }
+  // adjust rest for rate of fire for this world delta
+  const f_ents = fighterQuery(world)
+  for(let i=0;i<f_ents.length; i++){
+    Fighter.rest[f_ents[i]] -= delta
+    if(Fighter.rest[f_ents[i]] <= 0){
+      Fighter.rest[f_ents[i]] = 0 
+    }
+  }
   return world
 }
 
@@ -113,11 +167,43 @@ export const spawnGnome = (x,z,world) => {
   addComponent(world, Position, eid)
   addComponent(world, Rotation, eid)
   addComponent(world, Body, eid)
+  addComponent(world, Health, eid)
+  addComponent(world, Gnome, eid)
+  addComponent(world, Fighter, eid)
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
-  Body.r[eid] = 1
+  Body.r[eid] = 2
   Body.t[eid] = 2
+  Health.h = 100
+  Fighter.d[eid] = 20
+  Fighter.rate[eid] = 2000  // hit every 1 sec
+  Fighter.rest[eid] = 0  // ready to hit if 0
+  Fighter.team[eid] = 0 // gnome or mob
   return eid
 }
 
+export const spawnMob = (x,z,world) => {
+  const eid = addEntity(world)
+  addComponent(world, Position, eid)
+  addComponent(world, Rotation, eid)
+  addComponent(world, Body, eid)
+  addComponent(world, Health, eid)
+  addComponent(world, Mob, eid)
+  addComponent(world, MovementTarget, eid)
+  addComponent(world, Fighter, eid)
+  Position.x[eid] = x
+  Position.z[eid] = z 
+  Rotation.y[eid] = 0
+  Body.r[eid] = 2
+  Body.t[eid] = 2
+  Health.h = 100
+  MovementTarget.x[eid] = 0
+  MovementTarget.y[eid] = 0
+  MovementTarget.z[eid] = 0
+  Fighter.d[eid] = 20
+  Fighter.rate[eid] = 2000  // hit every 1 sec
+  Fighter.rest[eid] = 0  // ready to hit if 0
+  Fighter.team[eid] = 1 // gnome or mob
+  return eid
+}

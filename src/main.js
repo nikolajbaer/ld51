@@ -6,8 +6,9 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
+import skelFBXUrl from './assets/skeleton.fbx'
 import { createWorld,pipe, removeComponent,addComponent } from 'bitecs';
-import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem } from './GameSystems'
+import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob } from './GameSystems'
 import { configure_selections } from './selections';
 
 
@@ -174,13 +175,15 @@ function init(){
         obj3d.position.x = Position.x[eid]
         obj3d.position.z = Position.z[eid]
         obj3d.rotation.y = Rotation.y[eid]
-        if(false){ //Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
-          if(!obj3d.actions.walk.isRunning()){
-            obj3d.actions.walk.play()
-          }
-        }else{
-          if(!obj3d.actions.idle.isRunning()){
-            obj3d.actions.idle.play()
+        if(obj3d.actions){
+          if(false){ //Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
+            if(!obj3d.actions.walk.isRunning()){
+              obj3d.actions.walk.play()
+            }
+          }else{
+            if(!obj3d.actions.idle.isRunning()){
+              obj3d.actions.idle.play()
+            }
           }
         }
       }
@@ -197,6 +200,7 @@ function init(){
   }
   const loader = new FBXLoader(manager)
   load_model(loader,'gnome',gnomeFBXUrl,[{name:'walk',url:walkFBXUrl}])
+  load_model(loader,'skeleton',skelFBXUrl,[])
 
   // Resize Handler
   window.addEventListener( 'resize', () => {
@@ -204,6 +208,22 @@ function init(){
     camera.updateProjectionMatrix();
     renderer.setSize( window.innerWidth, window.innerHeight );
   }, false );
+
+  let level = 3
+  const mobSpawnInterval = setInterval(() => {
+    for(let i=0;i<level;i++){
+      const r = 200
+      const theta = Math.random() * Math.PI * 2
+      const eid = spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
+      const skel = obj3d_from_model("gnome",true)
+      skel.scale.x=0.01
+      skel.scale.y=0.01
+      skel.scale.z=0.01
+      //skel.actions.walk.play()
+      entity_to_object3d.set(eid,skel)
+      scene.add(skel)
+    }
+  },10000)
 
   // Animation Loop
   const animate = () => {
