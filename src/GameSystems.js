@@ -26,14 +26,18 @@ export const Health = defineComponent({h:Types.f32})
 export const Mob = defineComponent()
 export const Gnome = defineComponent()
 export const TriggerAnimation = defineComponent({a:Types.ui8})
+export const Death = defineComponent()
 
 export const movementQuery = defineQuery([Position,Rotation])
 export const renderQuery = defineQuery([Position,Rotation])
 export const selectedQuery = defineQuery([Selected])
 export const bodyQuery = defineQuery([Position,Body])
-const fighterQuery = defineQuery([Fighter])
-const damageQuery = defineQuery([Hit,Health,Fighter])
-const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
+export const animationTriggerQuery = defineQuery([TriggerAnimation])
+export const fighterQuery = defineQuery([Fighter])
+export const damageQuery = defineQuery([Hit,Health,Fighter])
+export const hitQuery = defineQuery([Hit])
+export const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
+export const deathQuery = defineQuery([Death])
 
 // TODO use planck to operate movement with collisions
 const plWorld = pl.World({})
@@ -73,15 +77,15 @@ export const movementSystem = (world) => {
   plWorld.clearForces()
 
   for (let c = plWorld.getContactList(); c; c = c.getNext()) {
-    const eid_a = c.getFixtureA().eid
-    const eid_b = c.getFixtureB().eid
+    const eid_a = c.getFixtureA().m_body.eid
+    const eid_b = c.getFixtureB().m_body.eid
     // if we are contacting enemies
     // last contact "wins"
     if(Fighter.team[eid_a] != Fighter.team[eid_b]){
       addComponent(world, Hit, eid_a)
-      Hit.v[eid] = eid_b
+      Hit.v[eid_a] = eid_b
       addComponent(world, Hit, eid_b)
-      Hit.v[eid] = eid_a
+      Hit.v[eid_b] = eid_a
     }
   }
   return world
@@ -96,11 +100,12 @@ export const damageSystem = (world) => {
       const eid_victim = Hit.v[eid]
       removeComponent(world, Hit, eid)
       // Apply Damage
-      Health[eid_victim] -= Fighter.d[eid]
-      if(Health[eid_victim] <= 0){
+      Health.h[eid_victim] -= Fighter.d[eid]
+      if(Health.h[eid_victim] <= 0){
         // Death
         addComponent(world,TriggerAnimation,eid_victim) 
         TriggerAnimation.a[eid_victim] = 2 // die
+        addComponent(world,Death,eid_victim)
       }else{
         addComponent(world,TriggerAnimation,eid_victim) 
         TriggerAnimation.a[eid_victim] = 1 // hit
@@ -119,6 +124,10 @@ export const damageSystem = (world) => {
       Fighter.rest[f_ents[i]] = 0 
     }
   }
+
+  // Clear hits after processing
+  hitQuery(world).forEach( (eid) => removeComponent(world,Hit,eid))
+
   return world
 }
 
@@ -140,13 +149,23 @@ export const targetingSystem = (world) => {
       const v1 = v.normalize().multiplyScalar(VELOCITY)
       const body = plBodyMap.get(eid)
       if(body){
-        // TODO
         body.setLinearVelocity(Vec2(v1.x,v1.z))
-        //body.setAngle(0)
       }
-      // TODO aim at angle
-      //Velocity.x[eid] = v1.x
-      //Velocity.z[eid] = v1.z
+    }
+  }
+  return world
+}
+
+export const deathSystem = (world) => {
+  const ents = deathQuery(world)
+  for(let i =0; i< ents.length; i++){
+    const eid = ents[i]
+    // CONSIDER what do I do about finishing animation?
+    removeEntity(world,eid) 
+    if(plBodyMap.has(eid)){
+      const body_to_remove = plBodyMap.get(eid)
+      plWorld.destroyBody(body_to_remove)
+      plBodyMap.delete(eid)
     }
   }
   return world
@@ -175,7 +194,7 @@ export const spawnGnome = (x,z,world) => {
   Rotation.y[eid] = 0
   Body.r[eid] = 2
   Body.t[eid] = 2
-  Health.h = 100
+  Health.h[eid] = 100
   Fighter.d[eid] = 20
   Fighter.rate[eid] = 2000  // hit every 1 sec
   Fighter.rest[eid] = 0  // ready to hit if 0
@@ -197,7 +216,7 @@ export const spawnMob = (x,z,world) => {
   Rotation.y[eid] = 0
   Body.r[eid] = 2
   Body.t[eid] = 2
-  Health.h = 100
+  Health.h[eid] = 100
   MovementTarget.x[eid] = 0
   MovementTarget.y[eid] = 0
   MovementTarget.z[eid] = 0

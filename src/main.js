@@ -8,8 +8,9 @@ import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
 import skelFBXUrl from './assets/skeleton_mixamo_idle.fbx'
 import { createWorld,pipe, removeComponent,addComponent } from 'bitecs';
-import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob } from './GameSystems'
+import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery } from './GameSystems'
 import { configure_selections } from './selections';
+import { AnimationStateMachine } from './animations';
 
 
 const models = new Map() 
@@ -64,6 +65,8 @@ function obj3d_from_model(name,has_skeleton){
     const mixer = new AnimationMixer(obj)
     model.scene.animations[0].name = "idle"
     obj.actions.idle = mixer.clipAction(model.scene.animations[0],obj)
+    obj.animstate = new AnimationStateMachine(obj.actions,0)
+    mixer.addEventListener('finished',() => obj.animstate.handleFinished())
 
     Object.keys(model.animations).map( key => {
       const action = mixer.clipAction(model.animations[key])
@@ -103,7 +106,6 @@ function spawn_gnomes(count,scene,world,entity_to_object3d){
     gnome.scale.x=0.01
     gnome.scale.y=0.01
     gnome.scale.z=0.01
-    gnome.actions.walk.play()
     entity_to_object3d.set(eid,gnome)
     scene.add(gnome)
   }
@@ -153,14 +155,11 @@ function init(){
     if(event.button == 0){ // LMB
       const px = ( event.clientX / window.innerWidth ) * 2 - 1;
 	    const py = - ( event.clientY / window.innerHeight ) * 2 + 1;
-      console.log(event)
       raycaster.setFromCamera({x:px,y:py},camera)
       const intersects = raycaster.intersectObjects( scene.children )
-      console.log(intersects)
       if(intersects.length){
         if(intersects[0].object.name == "ground"){
           const target = intersects[0].point
-          console.log("Targeting",target.x,target.z)
           const ents = selectedQuery(world)
           ents.forEach( (eid) => {
             addComponent(world,MovementTarget,eid)
@@ -176,6 +175,8 @@ function init(){
   const world = createWorld()
   world.time = { delta: 0, elapsed: 0, then: performance.now() }
   const entity_to_object3d = new Map() // eid to Object3d
+
+  // WE build this system here to share scope with Three stuff
   const renderSystem = (world) => {
     renderQuery(world).forEach( (eid) => {
       const obj3d = entity_to_object3d.get(eid)
@@ -184,28 +185,35 @@ function init(){
         obj3d.position.x = Position.x[eid]
         obj3d.position.z = Position.z[eid]
         obj3d.rotation.y = Rotation.y[eid]
-        if(obj3d.actions){
-          if(false){ //Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
-            if(!obj3d.actions.walk.isRunning()){
-              obj3d.actions.walk.play()
-            }
-          }else{
-            if(!obj3d.actions.idle.isRunning()){
-              obj3d.actions.idle.play()
-            }
-          }
-        }
       }
     })
-    // TODO removedQuery?
+    animationTriggerQuery(world).forEach( (eid) => {
+      const anim = TriggerAnimation.a[eid]
+      const obj3d = entity_to_object3d.get(eid)
+      if(obj3d && obj3d.animstate){
+        obj3d.animstate.trigger(anim)
+      }
+      removeComponent(world,TriggerAnimation,eid)
+    })
+
+    deathQuery(world).forEach( (eid) => {
+      const obj3d = entity_to_object3d.get(eid)
+      if(obj3d){
+        scene.remove(obj3d)
+        entity_to_object3d.delete(eid)
+      }
+    })
+    // TODO how do we identify cleaned up entities?
+    return world
   }
-  const pipeline = pipe(timeSystem,targetingSystem,movementSystem,renderSystem)
+
+  const pipeline = pipe(timeSystem,targetingSystem,movementSystem,damageSystem,renderSystem,deathSystem)
 
   // Load FBX Models
   const manager = new LoadingManager()
   manager.onLoad = () => {
     console.log("Loading complete!")
-    spawn_gnomes(25,scene,world,entity_to_object3d)
+    spawn_gnomes(4,scene,world,entity_to_object3d)
   }
   const loader = new FBXLoader(manager)
   load_model(loader,'gnome',gnomeFBXUrl,[{name:'walk',url:walkFBXUrl}])
@@ -218,21 +226,21 @@ function init(){
     renderer.setSize( window.innerWidth, window.innerHeight );
   }, false );
 
+  // Mob Spawner
   let level = 3
   const mobSpawnInterval = setInterval(() => {
     for(let i=0;i<level;i++){
-      const r = 200
+      const r = 50//200
       const theta = Math.random() * Math.PI * 2
       const eid = spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
       const skel = obj3d_from_model("skeleton",true)
       skel.scale.x=0.03
       skel.scale.y=0.03
       skel.scale.z=0.03
-      //skel.actions.walk.play()
       entity_to_object3d.set(eid,skel)
       scene.add(skel)
     }
-  },10000)
+  },5000)//10000)
 
   // Animation Loop
   const animate = () => {
