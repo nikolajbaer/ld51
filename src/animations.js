@@ -5,6 +5,13 @@ export const ANIM_MAP = [
   'hit',
   'die',
 ]
+export const Anim = {
+  idle: 0,
+  walk: 1,
+  attack: 2,
+  hit: 3,
+  die: 4,
+}
 
 export class AnimationStateMachine {
   constructor(actions,anim_id){
@@ -15,35 +22,30 @@ export class AnimationStateMachine {
     this.moving = false
   }
 
+  setMoving(moving){
+    if(moving && !this.moving){
+      this.trigger('walk')
+    }else if(!moving && this.moving){
+      this.trigger('idle')
+    }
+    this.moving = moving
+  }
+
   handleFinished(){
+    return
     if(this.moving){
+      this.current.crossFadeTo(this.actions.walk,0.5,false)
+    }else{
+      this.current.crossFadeTo(this.actions.idle,0.5,false)
     }
   }
 
-  trigger(anim_id){
-    const next = ANIM_MAP[anim_id]
-    this['on_'+next]()
-  }
-
-  on_idle(){
-    if(this.current_id == 'idle'){ return }
-    this.current.crossFadeTo(this.actions.idle,0.5,false)
-  }
-
-  on_walk(){
-
-  }
-
-  on_hit(){
-
-  }
-
-  on_attack(){
-
-  }
-
-  on_die(){
-
+  trigger(next){
+    return
+    if(this.current_id == next){ return }
+    this.current.crossFadeTo(this.actions[next],0.5,false)
+    this.current.reset()
+    this.current = this.actions[next]
   }
 
 }

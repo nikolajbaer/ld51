@@ -9,7 +9,7 @@ import {
   removeComponent,
   removeEntity,
 } from 'bitecs'
-
+import { Anim } from './animations'
 import { Vector3 } from 'three'
 import * as pl from 'planck'
 
@@ -19,6 +19,7 @@ export const Rotation = defineComponent({y:Types.f32})
 export const Selected = defineComponent()
 export const MovementTarget = defineComponent(Vec3)
 export const AttackTarget = defineComponent({y:Types.eid})
+export const Moving = defineComponent()
 export const Fighter = defineComponent({d:Types.f32,rest:Types.f32,rate:Types.f32,team:Types.ui8})
 export const Body = defineComponent({r:Types.f32,t:Types.ui8}) // mask and cat correspond to fixture filter/category in Planck
 export const Hit = defineComponent({v:Types.eid})
@@ -68,9 +69,12 @@ export const movementSystem = (world) => {
     // Rotate in direction of movement
     const vel = body.getLinearVelocity()
     if(Math.abs(vel.x) > 0 && Math.abs(vel.y) > 0){
+      addComponent(world, Moving, eid)
       const dot = vel.y
       const det = vel.x
       Rotation.y[eid] = Math.atan2(det,dot)
+    }else{
+      removeComponent(world, Moving, eid)
     }
   }
   plWorld.step(1/60,10,8)
@@ -82,6 +86,8 @@ export const movementSystem = (world) => {
     // if we are contacting enemies
     // last contact "wins"
     if(Fighter.team[eid_a] != Fighter.team[eid_b]){
+      // CONSIDER do we necessarily want to attack on every contact?
+      // Or should we only attack if this is their AttackTarget?
       addComponent(world, Hit, eid_a)
       Hit.v[eid_a] = eid_b
       addComponent(world, Hit, eid_b)
@@ -104,14 +110,14 @@ export const damageSystem = (world) => {
       if(Health.h[eid_victim] <= 0){
         // Death
         addComponent(world,TriggerAnimation,eid_victim) 
-        TriggerAnimation.a[eid_victim] = 2 // die
+        TriggerAnimation.a[eid_victim] = Anim.die // die
         addComponent(world,Death,eid_victim)
       }else{
         addComponent(world,TriggerAnimation,eid_victim) 
-        TriggerAnimation.a[eid_victim] = 1 // hit
+        TriggerAnimation.a[eid_victim] = Anim.hit // hit
       }
       addComponent(world,TriggerAnimation,eid_victim) 
-      TriggerAnimation.a[eid_victim] = 0 // attack
+      TriggerAnimation.a[eid_victim] = Anim.attack // attack
       // reset rate of attack counter
       Fighter.rest[eid] = Fighter.rate[eid]
     }

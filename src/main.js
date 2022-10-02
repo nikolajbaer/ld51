@@ -7,10 +7,10 @@ import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
 import skelFBXUrl from './assets/skeleton_mixamo_idle.fbx'
-import { createWorld,pipe, removeComponent,addComponent } from 'bitecs';
-import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery } from './GameSystems'
+import { createWorld,pipe, removeComponent,addComponent, hasComponent, entityExists } from 'bitecs';
+import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving } from './GameSystems'
 import { configure_selections } from './selections';
-import { AnimationStateMachine } from './animations';
+import { ANIM_MAP,AnimationStateMachine } from './animations';
 
 
 const models = new Map() 
@@ -143,13 +143,17 @@ function init(){
   //controls.enabled = false
   // Selection box
   configure_selections(camera,scene,renderer,(obj3d) => {
-    // item selected
-    addComponent(world,Selected,obj3d.parent.eid)
-    obj3d.parent.select_mesh.visible = true
+    // item selected. .might happen during cleanup cycle
+    if(entityExists(world,obj3d.parent.id)){
+      addComponent(world,Selected,obj3d.parent.eid)
+      obj3d.parent.select_mesh.visible = true
+    }
   },(obj3d) => {
-    // item deselected
-    removeComponent(world,Selected,obj3d.parent.eid)
-    obj3d.parent.select_mesh.visible = false
+    // item deselected. .might happen during cleanup cycle
+    if(entityExists(world,obj3d.parent.id)){
+      removeComponent(world,Selected,obj3d.parent.eid)
+      obj3d.parent.select_mesh.visible = false
+    }
   })
   document.addEventListener('click', (event) => {
     if(event.button == 0){ // LMB
@@ -185,13 +189,17 @@ function init(){
         obj3d.position.x = Position.x[eid]
         obj3d.position.z = Position.z[eid]
         obj3d.rotation.y = Rotation.y[eid]
+        if(obj3d.animstate){
+          // update if we are moving
+          obj3d.animstate.setMoving(hasComponent(world,Moving,eid))
+        }
       }
     })
     animationTriggerQuery(world).forEach( (eid) => {
       const anim = TriggerAnimation.a[eid]
       const obj3d = entity_to_object3d.get(eid)
       if(obj3d && obj3d.animstate){
-        obj3d.animstate.trigger(anim)
+        obj3d.animstate.trigger(ANIM_MAP[anim])
       }
       removeComponent(world,TriggerAnimation,eid)
     })
