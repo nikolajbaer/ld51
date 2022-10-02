@@ -218,17 +218,24 @@ function init(){
       }
   })
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('mouseup', (event) => {
     if(event.button == 0){ // LMB
-      const target_intersects = raycaster.intersectObjects( scene.children )
-      // TODO intersect attack targets
-      if(groundPos){
-        const ents = selectedQuery(world)
-        ents.forEach( (eid) => {
-          addComponent(world,MovementTarget,eid)
-          MovementTarget.x[eid] = groundPos.x
-          MovementTarget.z[eid] = groundPos.z
-        })
+      if(dropObject3d!=null){
+        house_timeout()
+        spawnHouse(dropObject3d.position.x,dropObject3d.position.z,world) 
+        scene.remove(dropObject3d)
+        dropObject3d = null
+      }else{
+        const target_intersects = raycaster.intersectObjects( scene.children )
+        // TODO intersect attack targets
+        if(groundPos){
+          const ents = selectedQuery(world)
+          ents.forEach( (eid) => {
+            addComponent(world,MovementTarget,eid)
+            MovementTarget.x[eid] = groundPos.x
+            MovementTarget.z[eid] = groundPos.z
+          })
+        }
       }
     }
   })
@@ -335,16 +342,6 @@ function init(){
       scene.add(dropObject3d)
     }
   })
-  document.addEventListener('pointerup', () => {
-    // set current drop item
-    if(dropObject3d!=null){
-      house_timeout()
-      spawnHouse(dropObject3d.position.x,dropObject3d.position.z,world) 
-      scene.remove(dropObject3d)
-      dropObject3d = null
-    }
-  })
-
   // Mob Spawner
   let level = 1
   const spawnInterval = setInterval(() => {
