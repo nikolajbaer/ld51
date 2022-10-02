@@ -8,6 +8,7 @@ import {
   pipe,
   removeComponent,
 } from 'bitecs'
+
 import { Vector3 } from 'three'
 
 export const Vec3 = { x: Types.f32, y: Types.f32, z: Types.f32 }
@@ -17,12 +18,16 @@ export const Velocity = defineComponent(Vec3)
 export const Selected = defineComponent()
 export const MovementTarget = defineComponent(Vec3)
 export const AttackTarget = defineComponent({y:Types.eid})
+export const CollisonRadius = defineComponent({r:Types.f32})
 
 export const movementQuery = defineQuery([Position, Velocity, Rotation])
 export const renderQuery = defineQuery([Position,Rotation])
 export const selectedQuery = defineQuery([Selected])
+export const colliderQuery = defineQuery([Position,CollisonRadius])
 const movementTargetQuery = defineQuery([MovementTarget,Position,Velocity])
 
+
+// TODO use planck to operate movement with collisions
 export const movementSystem = (world) => {
   const { time: { delta } } = world
   const ents = movementQuery(world)
@@ -77,11 +82,13 @@ export const spawnGnome = (x,z,world) => {
   addComponent(world, Position, eid)
   addComponent(world, Velocity, eid)
   addComponent(world, Rotation, eid)
+  addComponent(world, CollisonRadius, eid)
   Position.x[eid] = x
   Position.z[eid] = z 
   Velocity.x[eid] = 0
   Velocity.z[eid] = 0
   Rotation.y[eid] = 0
+  CollisonRadius.r[eid] = 1
   return eid
 }
 
