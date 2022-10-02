@@ -9,6 +9,8 @@ import {
   pipe,
   removeComponent,
   removeEntity,
+  entityExists,
+  Not,
 } from 'bitecs'
 import { Anim } from './animations'
 import { Vector3 } from 'three'
@@ -20,10 +22,11 @@ export const Rotation = defineComponent({y:Types.f32})
 export const RenderType = defineComponent({m:Types.ui8})
 export const Selected = defineComponent()
 export const MovementTarget = defineComponent(Vec3)
-export const AttackTarget = defineComponent({y:Types.eid})
+export const AttackTarget = defineComponent({a:Types.eid})
+export const Defend = defineComponent({x:Types.f32,z:Types.f32}) // coord of box to index mobs
 export const Moving = defineComponent()
 export const Fighter = defineComponent({d:Types.f32,rest:Types.f32,rate:Types.f32,team:Types.ui8})
-export const Body = defineComponent({r:Types.f32,t:Types.ui8}) // mask and cat correspond to fixture filter/category in Planck
+export const Body = defineComponent({r:Types.f32,t:Types.ui8,vel:Types.f32}) // mask and cat correspond to fixture filter/category in Planck
 export const Hit = defineComponent({v:Types.eid})
 export const Health = defineComponent({h:Types.f32})
 export const Mob = defineComponent()
@@ -41,8 +44,11 @@ export const fighterQuery = defineQuery([Fighter])
 export const damageQuery = defineQuery([Hit,Health,Fighter])
 export const hitQuery = defineQuery([Hit])
 export const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
+export const attackTargetQuery = defineQuery([AttackTarget])
 export const deathQuery = defineQuery([Death])
 export const mushroomHouseQuery = defineQuery([MushroomHouse])
+const mobQuery = defineQuery([Mob])
+const defenderQuery = defineQuery([Defend,Not(AttackTarget)])
 
 // TODO use planck to operate movement with collisions
 const plWorld = pl.World({})
@@ -57,7 +63,12 @@ export const movementSystem = (world) => {
     const eid = ents[i]
     let body = plBodyMap.get(eid)
     if(body==undefined){
-      body = plWorld.createBody({type:PL_BODY_TYPES[Body.t[eid]],position:Vec2(Position.x[eid],Position.z[eid]),angle:Rotation.y[eid]})
+      body = plWorld.createBody({
+        type:PL_BODY_TYPES[Body.t[eid]],
+        position:Vec2(Position.x[eid],Position.z[eid]),
+        angle:Rotation.y[eid],
+        linearDamping: 1,
+      })
       body.eid = eid
       const fixture = pl.Circle(Body.r[eid])
       body.createFixture(fixture)
@@ -141,22 +152,33 @@ export const damageSystem = (world) => {
   return world
 }
 
-const VELOCITY = 5
-const MIN_DIST = 3
+const MIN_DIST = 0.1 
 
 export const targetingSystem = (world) => {
+  // Start by updating any ents with attack targets
+  const a_ents = attackTargetQuery(world)
+  a_ents.forEach( (eid) => {
+    if(entityExists(world,AttackTarget.a[eid]) && hasComponent(world,Position,AttackTarget.a[eid])){
+      MovementTarget.x[eid] = Position.x[AttackTarget.a[eid]]
+      MovementTarget.z[eid] = Position.z[AttackTarget.a[eid]]
+    }else{
+      removeComponent(world,AttackTarget,eid) 
+    }
+  })
+
+  // Then go through all ents with movmeent targets, and point them at it with their velocity
   const ents = movementTargetQuery(world)
   for(let i =0; i< ents.length; i++){
     const eid = ents[i]
     const v = new Vector3(MovementTarget.x[eid] - Position.x[eid],0,MovementTarget.z[eid] - Position.z[eid])
-    if(v.length < MIN_DIST){ 
+    if(v.length() < MIN_DIST){ 
       removeComponent(world,MovementTarget,eid)
       const body = plBodyMap.get(eid)
       if(body){
         body.setLinearVelocity(Vec2(0,0))
       }
     }else{
-      const v1 = v.normalize().multiplyScalar(VELOCITY)
+      const v1 = v.normalize().multiplyScalar(Body.vel[eid])
       const body = plBodyMap.get(eid)
       if(body){
         body.setLinearVelocity(Vec2(v1.x,v1.z))
@@ -166,6 +188,42 @@ export const targetingSystem = (world) => {
   return world
 }
 
+const Z_W = 40
+const getZone = (x,y) => {
+  const i = Math.floor((x-Z_W/2)/Z_W)
+  const j = Math.floor((y-Z_W/2)/Z_W)
+  return `${i}x${j}` 
+}
+
+export const defendSystem = (world) => {
+  
+  const m_ents = mobQuery(world)
+  const zones = new Map()
+  m_ents.forEach( (eid) => {
+    const x = Position.x[eid] 
+    const z = Position.z[eid]
+    const zone = getZone(x,z)
+    if(!zones.has(zone)){
+      zones.set(zone,[eid])
+    }else{
+      zones.get(zone).push(eid)
+    }
+  })
+
+  const d_ents = defenderQuery(world)
+  d_ents.forEach( (eid) => {
+    const x = Position.x[eid] 
+    const z = Position.z[eid]
+    const zone = getZone(x,z)
+    if(zones.has(zone)){
+      const attack_eid = zones.get(zone)[0]
+      addComponent(world,AttackTarget,eid)
+      AttackTarget.a[eid] = attack_eid
+      removeComponent(world,Defend,eid)
+    }
+  })
+  return world
+}
 
 // TODO process gnome hits as build-juice
 export const houseSystem = (world) => {
@@ -181,7 +239,9 @@ export const houseSystem = (world) => {
       // if we have reached gnome spawn time, spawn a gnome and reset timer
       if(MushroomHouse.t[eid] > 10000){
         console.log("spawning House Gnome")
-        spawnGnome(Position.x[eid],Position.z[eid]+Body.r[eid]*2.5,world)
+        const r = 2.5 
+        const theta = Math.random() * Math.PI * 2
+        spawnGnome(r*Math.sin(theta) + Position.x[eid],r*Math.cos(theta)+Position.z[eid],world)
         MushroomHouse.t[eid] = 0
       }
     }
@@ -229,6 +289,7 @@ export const spawnGnome = (x,z,world) => {
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
+  Body.vel[eid] = 10
   Body.r[eid] = 2
   Body.t[eid] = 2
   Health.h[eid] = 100
@@ -253,6 +314,7 @@ export const spawnMob = (x,z,world) => {
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
+  Body.vel[eid] = 5
   Body.r[eid] = 2
   Body.t[eid] = 2
   Health.h[eid] = 100

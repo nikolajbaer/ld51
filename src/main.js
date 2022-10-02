@@ -9,14 +9,14 @@ import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
 import skelFBXUrl from './assets/skeleton_mixamo_idle.fbx'
 import houseFBXUrl from './assets/mushroom-house.fbx'
 import { createWorld,pipe, removeComponent,addComponent, hasComponent, entityExists } from 'bitecs';
-import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem } from './GameSystems'
+import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend } from './GameSystems'
 import { configure_selections } from './selections';
 import { Anim,ANIM_MAP,AnimationStateMachine } from './animations';
 
 const models = new Map() 
 const mixers = new Map()
 const GRID_SZ = 20 
-const GRID_CNT = 8 
+const GRID_CNT = 16 
 
 function create_ground_and_lights(scene){
   // Create Ground / Lighting
@@ -29,7 +29,7 @@ function create_ground_and_lights(scene){
 
   const texture = new TextureLoader().load( grassTextureUrl );
   texture.wrapS = texture.wrapT = RepeatWrapping
-  texture.repeat.set(80, 80);
+  texture.repeat.set(40, 40);
   texture.anisotropy = 16;
   const geometry = new PlaneGeometry( 1000, 1000);
   const material = new MeshStandardMaterial( { map: texture, repeat: RepeatWrapping } );
@@ -126,7 +126,7 @@ selectGeometry.setFromPoints([...Array(31).keys()].map( i => {
 const selectMaterial = new LineBasicMaterial({color:"white"})
 function addSelectionCircle(obj3d){
   const selectLines = new LineLoop(selectGeometry,selectMaterial)
-  selectLines.position.y = 2
+  selectLines.position.y = 100 
   selectLines.name = 'selection_highlight'
   selectLines.visible = false
   obj3d.add(selectLines)
@@ -191,6 +191,7 @@ function init(){
   let pointer = new Vector2()
   let groundPos = null 
   let dropObject3d = null
+  let ctrlDown = false
 
   //Keep track of pointer
   const snap = (v) => {
@@ -228,12 +229,27 @@ function init(){
       }else{
         const target_intersects = raycaster.intersectObjects( scene.children )
         // TODO intersect attack targets
-        if(groundPos){
+        if(target_intersects[0].object.parent.eid != undefined){
+          const target_eid = target_intersects[0].object.parent.eid
+          if(hasComponent(world,Mob,target_eid)){
+            selectedQuery(world).forEach( (eid) => {
+              addComponent(world,AttackTarget,eid)
+              AttackTarget.a[eid] = target_eid
+              // explicit attack supercedes defend
+              if(hasComponent(world,Defend,eid)){
+                removeComponent(world,Defend,eid)
+              }
+            })
+          }
+        }else if(groundPos){
           const ents = selectedQuery(world)
           ents.forEach( (eid) => {
             addComponent(world,MovementTarget,eid)
             MovementTarget.x[eid] = groundPos.x
             MovementTarget.z[eid] = groundPos.z
+            addComponent(world,Defend,eid)
+            Defend.x[eid] = groundPos.x
+            Defend.z[eid] = groundPos.z
           })
         }
       }
@@ -243,6 +259,8 @@ function init(){
   document.addEventListener('keydown', (event) => {
     if(event.key == "Shift"){
       controls.enabled=true
+    }else if(event.key == "Control"){
+      ctrlDown = true
     }
   })
   document.addEventListener('keyup', (event) => {
@@ -252,6 +270,8 @@ function init(){
     }
     if(event.key == "Shift"){
       controls.enabled=false
+    }else if(event.key == "Control"){
+      ctrlDown = false
     }
   })
  
@@ -297,7 +317,7 @@ function init(){
     return world
   }
 
-  const pipeline = pipe(timeSystem,houseSystem,targetingSystem,movementSystem,damageSystem,renderSystem,deathSystem)
+  const pipeline = pipe(timeSystem,houseSystem,targetingSystem,defendSystem,movementSystem,damageSystem,renderSystem,deathSystem)
 
   // Load FBX Models
   const manager = new LoadingManager()
@@ -333,7 +353,7 @@ function init(){
     },10000)
   }
 
-  drop_button.addEventListener('click', () => {
+  drop_button.addEventListener('click', (event) => {
     // set current drop item
     if(dropObject3d == null){
       dropObject3d = new Mesh(new PlaneGeometry(GRID_SZ/2,GRID_SZ/2,1,1),new MeshBasicMaterial({color:"lightblue",transparent:true,opacity:0.25}))
@@ -341,6 +361,7 @@ function init(){
       dropObject3d.position.y = 0.1
       scene.add(dropObject3d)
     }
+    event.preventDefault()
   })
   // Mob Spawner
   let level = 1
@@ -351,6 +372,7 @@ function init(){
       const theta = Math.random() * Math.PI * 2
       spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
     }
+    level *= 1.1 
   },10000)
 
   // start house button timeout

@@ -1,5 +1,4 @@
 import { SelectionBox } from 'three/examples/jsm/interactive/SelectionBox.js';
-import { SelectionHelper } from './SelectionHelper.js';
 
 export function configure_selections(camera, scene, renderer, onSelect, onDeselect) {
   const BUTTON = 2 // RMB
