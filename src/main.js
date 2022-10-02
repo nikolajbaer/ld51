@@ -1,5 +1,5 @@
 import './index.css'
-import { Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, PCFSoftShadowMap } from 'three'
+import { Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, PCFSoftShadowMap,GridHelper } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
@@ -36,6 +36,12 @@ function create_ground_and_lights(scene){
   ground.rotation.x = -Math.PI/2
   ground.name = "ground"
   scene.add( ground );
+
+  // Create house building grid
+  const gridHelper = new GridHelper( 8*20, 8,0x000000,0x000000 );
+  gridHelper.position.y = 0.01
+  gridHelper.material.linewidth = 2
+  scene.add( gridHelper );
 }
 
 function load_model(loader,name,url,animations){
@@ -124,7 +130,7 @@ function init(){
   camera.position.y = 75;  
   camera.position.z = 45;  
   camera.lookAt(new Vector3(0,0,0))
-  const renderer = new WebGLRenderer()
+  const renderer = new WebGLRenderer({antialias:true})
   renderer.setSize( window.innerWidth, window.innerHeight )
   renderer.shadowMap.enabled = true
   document.getElementById('root').appendChild( renderer.domElement )
@@ -144,13 +150,13 @@ function init(){
   // Selection box
   configure_selections(camera,scene,renderer,(obj3d) => {
     // item selected. .might happen during cleanup cycle
-    if(entityExists(world,obj3d.parent.id)){
+    if(entityExists(world,obj3d.parent.eid)){
       addComponent(world,Selected,obj3d.parent.eid)
       obj3d.parent.select_mesh.visible = true
     }
   },(obj3d) => {
     // item deselected. .might happen during cleanup cycle
-    if(entityExists(world,obj3d.parent.id)){
+    if(entityExists(world,obj3d.parent.eid)){
       removeComponent(world,Selected,obj3d.parent.eid)
       obj3d.parent.select_mesh.visible = false
     }
@@ -235,7 +241,7 @@ function init(){
   }, false );
 
   // Mob Spawner
-  let level = 3
+  let level = 1
   const mobSpawnInterval = setInterval(() => {
     for(let i=0;i<level;i++){
       const r = 50//200

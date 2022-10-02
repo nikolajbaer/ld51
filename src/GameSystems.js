@@ -26,6 +26,7 @@ export const Hit = defineComponent({v:Types.eid})
 export const Health = defineComponent({h:Types.f32})
 export const Mob = defineComponent()
 export const Gnome = defineComponent()
+export const MushroomHouse = defineComponent({t:Types.f32,b:Types.f32}) // Gnome Spawn Timer, percentage fully built
 export const TriggerAnimation = defineComponent({a:Types.ui8})
 export const Death = defineComponent()
 
@@ -39,6 +40,7 @@ export const damageQuery = defineQuery([Hit,Health,Fighter])
 export const hitQuery = defineQuery([Hit])
 export const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
 export const deathQuery = defineQuery([Death])
+export const mushroomHouseQuery = defineQuery([MushroomHouse])
 
 // TODO use planck to operate movement with collisions
 const plWorld = pl.World({})
@@ -162,6 +164,28 @@ export const targetingSystem = (world) => {
   return world
 }
 
+
+// TODO process gnome hits as build-juice
+export const houseSystem = (world) => {
+  const { time: { delta } } = world
+  const ents = mushroomHouseQuery(world)
+  ents.forEac( (eid) => {
+    if(MushroomHouse.b[eid] < 1){
+      // still building
+      MushroomHouse.b[eid] += delta/10000
+    }else{
+      // count timer
+      MushroomHouse.t[eid] += delta
+      // if we have reached gnome spawn time, spawn a gnome and reset timer
+      if(MushroomHouse.t[eid] > 10000){
+        spawnGnome(Position.x[eid],Position.z[eid],world)
+        MushroomHouse.t[eid] = 0
+      }
+    }
+  })
+  return world
+}
+
 export const deathSystem = (world) => {
   const ents = deathQuery(world)
   for(let i =0; i< ents.length; i++){
@@ -186,6 +210,8 @@ export const timeSystem = world => {
   time.then = now
   return world
 }
+
+// SPAWN FUNCTIONS
 
 export const spawnGnome = (x,z,world) => {
   const eid = addEntity(world)
@@ -231,4 +257,19 @@ export const spawnMob = (x,z,world) => {
   Fighter.rest[eid] = 0  // ready to hit if 0
   Fighter.team[eid] = 1 // gnome or mob
   return eid
+}
+
+export const spawnHouse = (x,z,world) => {
+  const eid = addEntity(world) 
+  addComponent(world, Position, eid)
+  addComponent(world, Rotation, eid)
+  addComponent(world, Body, eid)
+  addComponent(world, MushroomHouse, eid)
+  Position.x[eid] = x
+  Position.z[eid] = z 
+  Rotation.y[eid] = 0
+  Body.r[eid] = 20 
+  Body.t[eid] = 1
+  MushroomHouse.t[eid] = 10000 // Every 10 seconds
+  MushroomHouse.b[eid] = 0 // Build in 10 seconds
 }
