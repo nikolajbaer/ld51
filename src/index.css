@@ -45,3 +45,16 @@ canvas {
   background-color: rgba(75, 160, 255, 0.3);
   position: fixed;
 }
+
+.overlay {
+  position: fixed
+}
+.overlay.footer {
+  bottom: 8px;
+  left: 8px;
+}
+button {
+  padding: 8px;
+  font-size: 12pt;
+  cursor: pointer;
+}

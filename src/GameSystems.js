@@ -5,6 +5,7 @@ import {
   defineQuery,
   addEntity,
   addComponent,
+  hasComponent,
   pipe,
   removeComponent,
   removeEntity,
@@ -16,6 +17,7 @@ import * as pl from 'planck'
 export const Vec3 = { x: Types.f32, y: Types.f32, z: Types.f32 }
 export const Position = defineComponent(Vec3)
 export const Rotation = defineComponent({y:Types.f32})
+export const RenderType = defineComponent({m:Types.ui8})
 export const Selected = defineComponent()
 export const MovementTarget = defineComponent(Vec3)
 export const AttackTarget = defineComponent({y:Types.eid})
@@ -87,7 +89,7 @@ export const movementSystem = (world) => {
     const eid_b = c.getFixtureB().m_body.eid
     // if we are contacting enemies
     // last contact "wins"
-    if(Fighter.team[eid_a] != Fighter.team[eid_b]){
+    if(hasComponent(world,Fighter,eid_a) && hasComponent(world,Fighter,eid_b) && Fighter.team[eid_a] != Fighter.team[eid_b]){
       // CONSIDER do we necessarily want to attack on every contact?
       // Or should we only attack if this is their AttackTarget?
       addComponent(world, Hit, eid_a)
@@ -169,7 +171,7 @@ export const targetingSystem = (world) => {
 export const houseSystem = (world) => {
   const { time: { delta } } = world
   const ents = mushroomHouseQuery(world)
-  ents.forEac( (eid) => {
+  ents.forEach( (eid) => {
     if(MushroomHouse.b[eid] < 1){
       // still building
       MushroomHouse.b[eid] += delta/10000
@@ -178,7 +180,8 @@ export const houseSystem = (world) => {
       MushroomHouse.t[eid] += delta
       // if we have reached gnome spawn time, spawn a gnome and reset timer
       if(MushroomHouse.t[eid] > 10000){
-        spawnGnome(Position.x[eid],Position.z[eid],world)
+        console.log("spawning House Gnome")
+        spawnGnome(Position.x[eid],Position.z[eid]+Body.r[eid]*2.5,world)
         MushroomHouse.t[eid] = 0
       }
     }
@@ -221,6 +224,8 @@ export const spawnGnome = (x,z,world) => {
   addComponent(world, Health, eid)
   addComponent(world, Gnome, eid)
   addComponent(world, Fighter, eid)
+  addComponent(world, RenderType ,eid)
+  RenderType.m[eid] = 0
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
@@ -243,6 +248,8 @@ export const spawnMob = (x,z,world) => {
   addComponent(world, Mob, eid)
   addComponent(world, MovementTarget, eid)
   addComponent(world, Fighter, eid)
+  addComponent(world, RenderType ,eid)
+  RenderType.m[eid] = 1
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
@@ -265,11 +272,14 @@ export const spawnHouse = (x,z,world) => {
   addComponent(world, Rotation, eid)
   addComponent(world, Body, eid)
   addComponent(world, MushroomHouse, eid)
+  addComponent(world, RenderType ,eid)
+  RenderType.m[eid] = 2
   Position.x[eid] = x
   Position.z[eid] = z 
   Rotation.y[eid] = 0
-  Body.r[eid] = 20 
+  Body.r[eid] = 7 
   Body.t[eid] = 1
   MushroomHouse.t[eid] = 10000 // Every 10 seconds
   MushroomHouse.b[eid] = 0 // Build in 10 seconds
+  return eid
 }
