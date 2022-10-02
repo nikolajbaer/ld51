@@ -1,5 +1,5 @@
 import './index.css'
-import { Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry } from 'three'
+import { Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
@@ -7,7 +7,7 @@ import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
 import { createWorld,pipe, removeComponent,addComponent } from 'bitecs';
-import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Velocity,Selected, selectedQuery, MovementTarget,targetingSystem } from './GameSystems'
+import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem } from './GameSystems'
 import { configure_selections } from './selections';
 
 
@@ -103,6 +103,9 @@ function spawn_gnomes(count,scene,world,entity_to_object3d){
 function init(){
   // Init Three Scene
   const scene = new Scene();
+  const color = 0x000000;
+  const density = 0.1;
+  scene.fog = new Fog(color, density,400);
   const camera = new PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 )
   camera.near = 0.5
   camera.far = 5000
@@ -125,7 +128,7 @@ function init(){
   const raycaster = new Raycaster();
   const controls = new OrbitControls(camera,renderer.domElement)
   controls.enablePan = false
-  controls.enabled = false
+  //controls.enabled = false
   // Selection box
   configure_selections(camera,scene,renderer,(obj3d) => {
     // item selected
@@ -171,14 +174,12 @@ function init(){
         obj3d.position.x = Position.x[eid]
         obj3d.position.z = Position.z[eid]
         obj3d.rotation.y = Rotation.y[eid]
-        if(Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
+        if(false){ //Velocity.x[eid] > 0 && Velocity.z[eid] > 0){
           if(!obj3d.actions.walk.isRunning()){
-            console.log("walk")
             obj3d.actions.walk.play()
           }
         }else{
           if(!obj3d.actions.idle.isRunning()){
-            console.log("idle",obj3d.actions)
             obj3d.actions.idle.play()
           }
         }
