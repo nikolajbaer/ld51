@@ -1,12 +1,12 @@
 import './index.css'
-import { Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry } from 'three'
+import { Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, PCFSoftShadowMap } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
 import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
-import skelFBXUrl from './assets/skeleton.fbx'
+import skelFBXUrl from './assets/skeleton_mixamo_idle.fbx'
 import { createWorld,pipe, removeComponent,addComponent } from 'bitecs';
 import { spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob } from './GameSystems'
 import { configure_selections } from './selections';
@@ -19,7 +19,9 @@ function create_ground_and_lights(scene){
   // Create Ground / Lighting
   const ambient_light = new AmbientLight( 0x404040 ); // soft white light
   scene.add( ambient_light );
-  const directional_light = new DirectionalLight({color:"#eeeeff",castShadow:true})
+  const directional_light = new DirectionalLight("#eeeeff",1)
+  directional_light.position.y = 10 
+  directional_light.castShadow = true
   scene.add( directional_light )
 
   const texture = new TextureLoader().load( grassTextureUrl );
@@ -52,6 +54,12 @@ function obj3d_from_model(name,has_skeleton){
   if(has_skeleton){
     const model = models.get(name)
     const obj = SkeletonUtils.clone(model.scene)
+    obj.traverse( function ( child ) {
+      if ( child.isMesh ) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    });
     obj.actions = {}
     const mixer = new AnimationMixer(obj)
     model.scene.animations[0].name = "idle"
@@ -116,6 +124,7 @@ function init(){
   camera.lookAt(new Vector3(0,0,0))
   const renderer = new WebGLRenderer()
   renderer.setSize( window.innerWidth, window.innerHeight )
+  renderer.shadowMap.enabled = true
   document.getElementById('root').appendChild( renderer.domElement )
   const clock = new Clock();
   // debug
@@ -215,10 +224,10 @@ function init(){
       const r = 200
       const theta = Math.random() * Math.PI * 2
       const eid = spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
-      const skel = obj3d_from_model("gnome",true)
-      skel.scale.x=0.01
-      skel.scale.y=0.01
-      skel.scale.z=0.01
+      const skel = obj3d_from_model("skeleton",true)
+      skel.scale.x=0.03
+      skel.scale.y=0.03
+      skel.scale.z=0.03
       //skel.actions.walk.play()
       entity_to_object3d.set(eid,skel)
       scene.add(skel)
