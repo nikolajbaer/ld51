@@ -69,11 +69,15 @@ button {
 }
 #intro div {
   width: 500px;
-  height: 300px;
+  height: 375px;
   padding: 4px;
   background-color: #333;
   border: solid 1px white;
   text-align: center;
+}
+#intro div ul {
+  text-align: left;
+  margin: 10px;
 }
 
 #cookpot_overlay {

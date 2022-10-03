@@ -194,7 +194,6 @@ function spawn_start_entities(count,scene,world,entity_to_object3d){
   }
   spawnPot(0,0,world)
   started = new Date()
-  sounds.get('music').play()
 }
 
 function init(){
@@ -483,6 +482,12 @@ function init(){
   begin_button.addEventListener('click', (event) => {
     const intro = document.getElementById('intro')
     intro.style.display = 'none'
+
+    if(document.getElementById("sound").checked){
+      sounds.get('music').play()
+    }else{
+      audio.setMasterVolume(0)
+    }
 
     // BEGIN
     const spawnInterval = setInterval(() => {
