@@ -372,7 +372,7 @@ function init(){
       const theta = Math.random() * Math.PI * 2
       spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
     }
-    level *= 1.1 
+    level += 0.5
   },10000)
 
   // start house button timeout

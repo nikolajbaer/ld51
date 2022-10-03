@@ -91,6 +91,7 @@ export const movementSystem = (world) => {
     }else{
       removeComponent(world, Moving, eid)
     }
+
   }
   plWorld.step(1/60,10,8)
   plWorld.clearForces()
@@ -165,7 +166,6 @@ export const targetingSystem = (world) => {
       removeComponent(world,AttackTarget,eid) 
     }
   })
-
   // Then go through all ents with movmeent targets, and point them at it with their velocity
   const ents = movementTargetQuery(world)
   for(let i =0; i< ents.length; i++){
