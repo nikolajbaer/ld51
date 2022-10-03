@@ -34,6 +34,7 @@ export const Gnome = defineComponent()
 export const MushroomHouse = defineComponent({t:Types.f32,b:Types.f32}) // Gnome Spawn Timer, percentage fully built
 export const TriggerAnimation = defineComponent({a:Types.ui8})
 export const Death = defineComponent()
+export const CookPot = defineComponent()
 
 export const movementQuery = defineQuery([Position,Rotation])
 export const renderQuery = defineQuery([Position,Rotation])
@@ -76,6 +77,7 @@ export const movementSystem = (world) => {
     }
 
     const pos = body.getPosition()
+    // store how much we moved in the last tick
     Position.x[eid] = pos.x
     Position.z[eid] = pos.y 
     // handle rotation based on where unit is going
@@ -83,7 +85,7 @@ export const movementSystem = (world) => {
 
     // Rotate in direction of movement
     const vel = body.getLinearVelocity()
-    if(Math.abs(vel.x) > 0 && Math.abs(vel.y) > 0){
+    if(vel.length() > 0.1){
       addComponent(world, Moving, eid)
       const dot = vel.y
       const det = vel.x
@@ -132,8 +134,8 @@ export const damageSystem = (world) => {
         addComponent(world,TriggerAnimation,eid_victim) 
         TriggerAnimation.a[eid_victim] = Anim.hit // hit
       }
-      addComponent(world,TriggerAnimation,eid_victim) 
-      TriggerAnimation.a[eid_victim] = Anim.attack // attack
+      addComponent(world,TriggerAnimation,eid) 
+      TriggerAnimation.a[eid] = Anim.attack // attack
       // reset rate of attack counter
       Fighter.rest[eid] = Fighter.rate[eid]
     }
@@ -153,7 +155,7 @@ export const damageSystem = (world) => {
   return world
 }
 
-const MIN_DIST = 0.1 
+const MIN_DIST = 1 
 
 export const targetingSystem = (world) => {
   // Start by updating any ents with attack targets
@@ -343,5 +345,23 @@ export const spawnHouse = (x,z,world) => {
   Body.t[eid] = 1
   MushroomHouse.t[eid] = 10000 // Every 10 seconds
   MushroomHouse.b[eid] = 0 // Build in 10 seconds
+  return eid
+}
+
+export const spawnPot = (x,z,world) => {
+  const eid = addEntity(world)
+  addComponent(world, Position, eid)
+  addComponent(world, Rotation, eid)
+  addComponent(world, Body, eid)
+  addComponent(world, Health, eid)
+  addComponent(world, RenderType ,eid)
+  addComponent(world, CookPot, eid)
+  RenderType.m[eid] = 3
+  Position.x[eid] = x
+  Position.z[eid] = z 
+  Body.vel[eid] = 0
+  Body.r[eid] = 6
+  Body.t[eid] = 1
+  Health.h[eid] = 500
   return eid
 }

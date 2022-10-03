@@ -32,19 +32,23 @@ export class AnimationStateMachine {
   }
 
   handleFinished(){
-    return
     if(this.moving){
-      this.current.crossFadeTo(this.actions.walk,0.5,false)
+      this.trigger('walk') 
     }else{
-      this.current.crossFadeTo(this.actions.idle,0.5,false)
+      this.trigger('idle') 
     }
   }
 
   trigger(next){
-    return
     if(this.current_id == next){ return }
-    this.current.crossFadeTo(this.actions[next],0.5,false)
+    if(!this.actions[next]){
+      console.error("Woops, missing animation ",next)
+      return
+    }
+    this.current.stop()
+    this.actions[next].play()
     this.current.reset()
+    this.current_id = next
     this.current = this.actions[next]
   }
 

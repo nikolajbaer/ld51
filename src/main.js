@@ -1,15 +1,24 @@
 import './index.css'
-import { Vector2,Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, PCFSoftShadowMap,GridHelper, BoxGeometry } from 'three'
+import { NearestFilter,Vector2,Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneBufferGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, GridHelper, BoxGeometry, LoopOnce } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import * as SkeletonUtils from  'three/examples/jsm/utils/SkeletonUtils'
 import gnomeFBXUrl from './assets/gnome_skin_mixamo_idle.fbx'
-import walkFBXUrl from './assets/gnome_mixamo_walking.fbx'
+import gnomeWalkFBXUrl from './assets/gnome_mixamo_walking.fbx'
+import gnomeHitFBXUrl from './assets/gnome_mixamo_hit.fbx'
+import gnomeAttackFBXUrl from './assets/gnome_mixamo_punch.fbx'
+import gnomeDieFBXUrl from './assets/gnome_mixamo_die.fbx'
 import skelFBXUrl from './assets/skeleton_mixamo_idle.fbx'
+import skelWalkFBXUrl from './assets/skeleton_mixamo_walk.fbx'
+import skelAttackFBXUrl from './assets/skeleton_mixamo_attack.fbx'
+import skelDieFBXUrl from './assets/skeleton_mixamo_die.fbx'
+import skelHitFBXUrl from './assets/skeleton_mixamo_hit.fbx'
 import houseFBXUrl from './assets/mushroom-house.fbx'
+import potFBXUrl from './assets/cauldron.fbx'
+import roundShadowTexUrl from './assets/roundshadow.png'
 import { createWorld,pipe, removeComponent,addComponent, hasComponent, entityExists } from 'bitecs';
-import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend } from './GameSystems'
+import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend, spawnPot } from './GameSystems'
 import { configure_selections } from './selections';
 import { Anim,ANIM_MAP,AnimationStateMachine } from './animations';
 
@@ -24,17 +33,15 @@ function create_ground_and_lights(scene){
   scene.add( ambient_light );
   const directional_light = new DirectionalLight("#eeeeff",1)
   directional_light.position.y = 10 
-  directional_light.castShadow = true
   scene.add( directional_light )
 
   const texture = new TextureLoader().load( grassTextureUrl );
   texture.wrapS = texture.wrapT = RepeatWrapping
   texture.repeat.set(40, 40);
   texture.anisotropy = 16;
-  const geometry = new PlaneGeometry( 1000, 1000);
+  const geometry = new PlaneBufferGeometry( 1000, 1000);
   const material = new MeshStandardMaterial( { map: texture, repeat: RepeatWrapping } );
   const ground = new Mesh( geometry, material );
-  ground.receiveShadow = true
   ground.rotation.x = -Math.PI/2
   ground.name = "ground"
   scene.add( ground );
@@ -66,21 +73,23 @@ function obj3d_from_model(name,has_skeleton){
   if(has_skeleton){
     const model = models.get(name)
     const obj = SkeletonUtils.clone(model.scene)
-    obj.traverse( function ( child ) {
-      if ( child.isMesh ) {
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    });
     obj.actions = {}
     const mixer = new AnimationMixer(obj)
     model.scene.animations[0].name = "idle"
     obj.actions.idle = mixer.clipAction(model.scene.animations[0],obj)
     obj.animstate = new AnimationStateMachine(obj.actions,Anim.idle)
-    mixer.addEventListener('finished',() => obj.animstate.handleFinished())
+    mixer.addEventListener('finished',() => {
+      if(obj.mark_for_removal){
+        scene.remove(obj)
+      }
+      obj.animstate.handleFinished()
+    })
 
     Object.keys(model.animations).map( key => {
       const action = mixer.clipAction(model.animations[key])
+      if(key != "idle" && key != "walk"){
+        action.setLoop(LoopOnce,1)
+      }
       obj.actions[key] = action
     })
     mixers.set(obj.uuid,mixer)
@@ -95,6 +104,7 @@ function createEntityObject3d(eid){
     case 0: // gnome
       const gnome = obj3d_from_model("gnome",true)
       addSelectionCircle(gnome)
+      addFakeShadow(gnome,0.01)
       gnome.children.filter(m => m.type == 'SkinnedMesh').forEach( m => m.selectable = true)
       gnome.scale.x=0.01
       gnome.scale.y=0.01
@@ -103,6 +113,7 @@ function createEntityObject3d(eid){
       return gnome
     case 1:  // skel
       const skel = obj3d_from_model("skeleton",true)
+      addFakeShadow(skel,0.03)
       skel.scale.x=0.03
       skel.scale.y=0.03
       skel.scale.z=0.03
@@ -113,6 +124,12 @@ function createEntityObject3d(eid){
       house.scale.set(0.5,0.5,0.5)
       scene.add(house)
       return house
+    case 3:
+      const pot = obj3d_from_model("pot",false)
+      addFakeShadow(pot,0.05)
+      pot.scale.set(0.05,0.05,0.05)
+      scene.add(pot)
+      return pot
   }
 }
 
@@ -133,13 +150,34 @@ function addSelectionCircle(obj3d){
   obj3d.select_mesh = selectLines
 }
 
-function spawn_gnomes(count,scene,world,entity_to_object3d){
+let shadowMat = null
+const shadowGeo = new PlaneBufferGeometry(5,5);
+function addFakeShadow(obj3d,scale){
+  // roughly from https://r105.threejsfundamentals.org/threejs/lessons/threejs-shadows.html
+  if(shadowMat == null){
+    const shadowTexture = new TextureLoader().load(roundShadowTexUrl)
+    shadowMat = new MeshBasicMaterial({
+      map: shadowTexture,
+      transparent: true,    // so we can see the ground
+      opacity: 0.5,
+      //depthWrite: false,    // so we don't have to sort
+    })
+  }
+  const shadowMesh = new Mesh(shadowGeo, shadowMat);
+  shadowMesh.rotation.x = -Math.PI/2
+  shadowMesh.position.y = 1
+  shadowMesh.scale.set(1/scale,1/scale,1/scale)
+  obj3d.add(shadowMesh) 
+}
+
+function spawn_start_entities(count,scene,world,entity_to_object3d){
   // Spawn Initial Gnomes
   for(let i=0;i<count;i++){
     const x = (i%5 - 2.5) * 5 
     const z = (Math.floor(i/5) - 2.5) * 5
     spawnGnome(x,z,world)
   }
+  spawnPot(0,0,world)
 }
 
 function init(){
@@ -154,7 +192,6 @@ function init(){
   camera.lookAt(new Vector3(0,0,0))
   const renderer = new WebGLRenderer({antialias:true})
   renderer.setSize( window.innerWidth, window.innerHeight )
-  renderer.shadowMap.enabled = true
   document.getElementById('root').appendChild( renderer.domElement )
   const clock = new Clock();
   // debug
@@ -310,7 +347,12 @@ function init(){
     deathQuery(world).forEach( (eid) => {
       const obj3d = entity_to_object3d.get(eid)
       if(obj3d){
-        scene.remove(obj3d)
+        // Set a flag for animation finished to remove if we are doing a death animation
+        if(obj3d.animstate && obj3d.animstate.current_id == "die"){
+          obj3d.mark_for_removal = true
+        }else{
+          scene.remove(obj3d)
+        }
         entity_to_object3d.delete(eid)
       }
     })
@@ -323,12 +365,13 @@ function init(){
   const manager = new LoadingManager()
   manager.onLoad = () => {
     console.log("Loading complete!")
-    spawn_gnomes(4,scene,world,entity_to_object3d)
+    spawn_start_entities(4,scene,world,entity_to_object3d)
   }
   const loader = new FBXLoader(manager)
-  load_model(loader,'gnome',gnomeFBXUrl,[{name:'walk',url:walkFBXUrl}])
-  load_model(loader,'skeleton',skelFBXUrl,[])
+  load_model(loader,'gnome',gnomeFBXUrl,[{name:'walk',url:gnomeWalkFBXUrl},{name:'hit',url:gnomeHitFBXUrl},{name:'die',url:gnomeDieFBXUrl},{name:'attack',url:gnomeAttackFBXUrl}])
+  load_model(loader,'skeleton',skelFBXUrl,[{name:'walk',url:skelWalkFBXUrl},{name:'attack',url:skelAttackFBXUrl},{name:'die',url:skelDieFBXUrl},{name:'hit',url:skelHitFBXUrl}])
   load_model(loader,'house',houseFBXUrl,[])
+  load_model(loader,'pot',potFBXUrl,[])
 
   // Resize Handler
   window.addEventListener( 'resize', () => {
@@ -356,7 +399,7 @@ function init(){
   drop_button.addEventListener('click', (event) => {
     // set current drop item
     if(dropObject3d == null){
-      dropObject3d = new Mesh(new PlaneGeometry(GRID_SZ/2,GRID_SZ/2,1,1),new MeshBasicMaterial({color:"lightblue",transparent:true,opacity:0.25}))
+      dropObject3d = new Mesh(new PlaneBufferGeometry(GRID_SZ/2,GRID_SZ/2,1,1),new MeshBasicMaterial({color:"lightblue",transparent:true,opacity:0.25}))
       dropObject3d.rotation.x=-Math.PI/2
       dropObject3d.position.y = 0.1
       scene.add(dropObject3d)
@@ -367,12 +410,13 @@ function init(){
   let level = 1
   const spawnInterval = setInterval(() => {
     // Spawn Mob
+    console.log("spawning ",Math.floor(level)," skellies")
     for(let i=0;i<level;i++){
       const r = 200
       const theta = Math.random() * Math.PI * 2
       spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
     }
-    level += 0.5
+    level += 0.1
   },10000)
 
   // start house button timeout
