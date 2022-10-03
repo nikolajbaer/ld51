@@ -1,5 +1,5 @@
 import './index.css'
-import { NearestFilter,Vector2,Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneBufferGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, GridHelper, BoxGeometry, LoopOnce } from 'three'
+import { AudioListener,NearestFilter,Vector2,Fog,Raycaster,LineLoop,LineBasicMaterial,Clock,Vector3,Scene,PerspectiveCamera,WebGLRenderer,RepeatWrapping, PlaneBufferGeometry,TextureLoader,MeshStandardMaterial,Mesh,AmbientLight, DirectionalLight, AnimationMixer, LoadingManager, Group, MeshBasicMaterial,BufferGeometry, GridHelper, BoxGeometry, LoopOnce, AudioLoader } from 'three'
 import grassTextureUrl from './assets/tex/grass.png'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
@@ -18,15 +18,19 @@ import houseFBXUrl from './assets/mushroom-house.fbx'
 import potFBXUrl from './assets/cauldron.fbx'
 import roundShadowTexUrl from './assets/roundshadow.png'
 import { createWorld,pipe, removeComponent,addComponent, hasComponent, entityExists } from 'bitecs';
-import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend, spawnPot, cookpotQuery, Health } from './GameSystems'
+import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend, spawnPot, cookpotQuery, Health, soundTriggerQuery, TriggerSound } from './GameSystems'
 import { configure_selections } from './selections';
 import { Anim,ANIM_MAP,AnimationStateMachine } from './animations';
+import { load_sounds } from './sounds';
 
 const models = new Map() 
 const mixers = new Map()
 const GRID_SZ = 20 
 const GRID_CNT = 16 
-let started = false
+let started = null
+let ended = null
+let sounds = new Map()
+const audio = new AudioListener()
 
 function create_ground_and_lights(scene){
   // Create Ground / Lighting
@@ -189,7 +193,7 @@ function spawn_start_entities(count,scene,world,entity_to_object3d){
     spawnGnome(x,z,world)
   }
   spawnPot(0,0,world)
-  started = true
+  started = new Date()
 }
 
 function init(){
@@ -202,6 +206,7 @@ function init(){
   camera.position.y = 175;  
   camera.position.z = 175;  
   camera.lookAt(new Vector3(0,0,0))
+  camera.add(audio)
   const renderer = new WebGLRenderer({antialias:true})
   renderer.setSize( window.innerWidth, window.innerHeight )
   document.getElementById('root').appendChild( renderer.domElement )
@@ -273,6 +278,8 @@ function init(){
       if(dropObject3d!=null){
         house_timeout()
         spawnHouse(dropObject3d.position.x,dropObject3d.position.z,world) 
+        const snd = sounds.get("drop_house")
+        if(snd){ snd.play() }
         scene.remove(dropObject3d)
         dropObject3d = null
       }else{
@@ -356,6 +363,15 @@ function init(){
       removeComponent(world,TriggerAnimation,eid)
     })
 
+    soundTriggerQuery(world).forEach( (eid) => {
+      const sound = sounds.get(TriggerSound.s[eid])
+      console.log("playing ",TriggerSound.s[eid])
+      if(sound){
+        sound.play()
+      }
+      removeComponent(world,TriggerSound, eid)
+    })
+
     deathQuery(world).forEach( (eid) => {
       const obj3d = entity_to_object3d.get(eid)
       if(obj3d){
@@ -384,6 +400,8 @@ function init(){
   load_model(loader,'skeleton',skelFBXUrl,[{name:'walk',url:skelWalkFBXUrl},{name:'attack',url:skelAttackFBXUrl},{name:'die',url:skelDieFBXUrl},{name:'hit',url:skelHitFBXUrl}])
   load_model(loader,'house',houseFBXUrl,[])
   load_model(loader,'pot',potFBXUrl,[])
+
+  load_sounds(manager,audio,sounds)
 
   // Resize Handler
   window.addEventListener( 'resize', () => {
@@ -445,7 +463,10 @@ function init(){
           cookpot_overlay.style.bottom = `${pos.y + 40}px`
           cookpot_overlay.children[0].style.width = `${(Math.round(health/2000 *100))}%`
         }
-      }else{
+      }else if(ended == null){
+        ended = new Date()
+        const gametime = Math.round((ended.getTime() - started.getTime())/1000)
+        document.getElementById("gametime").innerText = `${gametime}s`
         const gameover = document.getElementById("gameover").children[0]
         gameover.style.display = 'block'
         gameover.style.pointerEvents = 'auto'

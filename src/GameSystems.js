@@ -13,6 +13,7 @@ import {
   Not,
 } from 'bitecs'
 import { Anim } from './animations'
+import { Sounds } from './sounds'
 import { Vector3 } from 'three'
 import * as pl from 'planck'
 
@@ -33,6 +34,7 @@ export const Mob = defineComponent()
 export const Gnome = defineComponent()
 export const MushroomHouse = defineComponent({t:Types.f32,b:Types.f32}) // Gnome Spawn Timer, percentage fully built
 export const TriggerAnimation = defineComponent({a:Types.ui8})
+export const TriggerSound = defineComponent({s:Types.ui8})
 export const Death = defineComponent()
 export const CookPot = defineComponent()
 
@@ -49,6 +51,7 @@ export const attackTargetQuery = defineQuery([AttackTarget])
 export const deathQuery = defineQuery([Death])
 export const mushroomHouseQuery = defineQuery([MushroomHouse])
 export const cookpotQuery = defineQuery([CookPot])
+export const soundTriggerQuery = defineQuery([TriggerSound])
 const mobQuery = defineQuery([Mob])
 const defenderQuery = defineQuery([Defend,Not(AttackTarget)])
 
@@ -67,6 +70,16 @@ const handleHit = (a,b,world) => {
       addComponent(world, Hit, a)
       Hit.v[a] = b
     }
+  }
+}
+
+const triggerSound = (world,eid,sound) => {
+  if(hasComponent(world,Mob,eid)){
+    addComponent(world,TriggerSound,eid)
+    TriggerSound.s[eid] = sound+10
+  }else if(hasComponent(world,Gnome,eid)){
+    addComponent(world,TriggerSound,eid)
+    TriggerSound.s[eid] = sound
   }
 }
 
@@ -137,12 +150,14 @@ export const damageSystem = (world) => {
         addComponent(world,TriggerAnimation,eid_victim) 
         TriggerAnimation.a[eid_victim] = Anim.die // die
         addComponent(world,Death,eid_victim)
+        triggerSound(world,eid_victim,Sounds.die)
       }else{
         addComponent(world,TriggerAnimation,eid_victim) 
         TriggerAnimation.a[eid_victim] = Anim.hit // hit
       }
       addComponent(world,TriggerAnimation,eid) 
       TriggerAnimation.a[eid] = Anim.attack // attack
+      triggerSound(world,eid,Sounds.grunt)
       // reset rate of attack counter
       Fighter.rest[eid] = Fighter.rate[eid]
     }
@@ -250,7 +265,7 @@ export const houseSystem = (world) => {
         console.log("spawning House Gnome")
         const r = 2.5 
         const theta = Math.random() * Math.PI * 2
-        spawnGnome(r*Math.sin(theta) + Position.x[eid],r*Math.cos(theta)+Position.z[eid],world)
+        spawnGnome(r*Math.sin(theta) + Position.x[eid],r*Math.cos(theta)+Position.z[eid],world,true)
         MushroomHouse.t[eid] = 0
       }
     }
@@ -285,7 +300,7 @@ export const timeSystem = world => {
 
 // SPAWN FUNCTIONS
 
-export const spawnGnome = (x,z,world) => {
+export const spawnGnome = (x,z,world,spawnSound) => {
   const eid = addEntity(world)
   addComponent(world, Position, eid)
   addComponent(world, Rotation, eid)
@@ -294,6 +309,10 @@ export const spawnGnome = (x,z,world) => {
   addComponent(world, Gnome, eid)
   addComponent(world, Fighter, eid)
   addComponent(world, RenderType ,eid)
+  if(spawnSound){
+    addComponent(world, TriggerSound, eid)
+    TriggerSound.s[eid] = Sounds.gnome_spawn
+  }
   RenderType.m[eid] = 0
   Position.x[eid] = x
   Position.z[eid] = z 
@@ -319,6 +338,8 @@ export const spawnMob = (x,z,world) => {
   addComponent(world, MovementTarget, eid)
   addComponent(world, Fighter, eid)
   addComponent(world, RenderType ,eid)
+  addComponent(world, TriggerSound, eid)
+  TriggerSound.s[eid] = Sounds.spawn + 10
   RenderType.m[eid] = 1
   Position.x[eid] = x
   Position.z[eid] = z 
