@@ -194,6 +194,7 @@ function spawn_start_entities(count,scene,world,entity_to_object3d){
   }
   spawnPot(0,0,world)
   started = new Date()
+  sounds.get('music').play()
 }
 
 function init(){
