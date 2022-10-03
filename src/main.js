@@ -199,6 +199,8 @@ function spawn_start_entities(count,scene,world,entity_to_object3d){
 function init(){
   // Init Three Scene
   const scene = new Scene();
+  const fog = new Fog(0x000000,200,500)
+  scene.fog = fog
   const camera = new PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 0.1, 1000 )
   camera.near = 0.5
   camera.far = 5000
@@ -223,6 +225,10 @@ function init(){
 
 
   const controls = new OrbitControls(camera,renderer.domElement)
+  controls.maxDistance = 500
+  controls.minDistance = 30
+  controls.minPolarAngle = 0 
+  controls.maxPolarAngle = Math.PI/2-0.1
   controls.enablePan = false
   controls.enabled = false
 
@@ -297,6 +303,10 @@ function init(){
               }
             })
           }
+          if(selectedQuery(world).length >= 5){
+            const ack = sounds.get('ack')
+            if(ack){ ack.play() }
+          }
         }else if(groundPos){
           const ents = selectedQuery(world)
           ents.forEach( (eid) => {
@@ -307,6 +317,10 @@ function init(){
             Defend.x[eid] = groundPos.x
             Defend.z[eid] = groundPos.z
           })
+          if(selectedQuery(world).length >= 10){
+            const ack = sounds.get('ack')
+            if(ack){ ack.play() }
+          }
         }
       }
     }

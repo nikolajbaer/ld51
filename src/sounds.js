@@ -6,6 +6,7 @@ import gnomeDieUrl from './assets/sounds/gnome_die.ogg'
 import houseDropUrl from './assets/sounds/house_drop.ogg'
 import skelDieUrl from './assets/sounds/skel_die.ogg'
 import musicUrl from './assets/sounds/music.ogg'
+import gnomeAckUrl from './assets/sounds/gnome_ack.ogg'
 import { AudioLoader,Audio } from 'three'
 
 export const Sounds = {
@@ -28,6 +29,7 @@ export function load_sounds(manager,listener,sounds){
     {url:houseDropUrl,key:"drop_house",vol:1},
     {url:skelDieUrl,key:12,vol:1},
     {url:musicUrl,key:"music",vol:1,repeat:true},
+    {url:gnomeAckUrl,key:"ack",vol:1},
   ]  
   to_load.forEach( (s) => {
     audio_loader.load(s.url, (buffer) => {
