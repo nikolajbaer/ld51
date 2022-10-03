@@ -18,7 +18,7 @@ import houseFBXUrl from './assets/mushroom-house.fbx'
 import potFBXUrl from './assets/cauldron.fbx'
 import roundShadowTexUrl from './assets/roundshadow.png'
 import { createWorld,pipe, removeComponent,addComponent, hasComponent, entityExists } from 'bitecs';
-import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend, spawnPot } from './GameSystems'
+import { RenderType,spawnGnome,renderQuery,Rotation,Position,movementSystem,timeSystem,Selected, selectedQuery, MovementTarget,targetingSystem, spawnMob, damageSystem, deathSystem, animationTriggerQuery, TriggerAnimation,deathQuery, Moving, spawnHouse, houseSystem, AttackTarget,Mob, defendSystem, Defend, spawnPot, cookpotQuery, Health } from './GameSystems'
 import { configure_selections } from './selections';
 import { Anim,ANIM_MAP,AnimationStateMachine } from './animations';
 
@@ -26,6 +26,7 @@ const models = new Map()
 const mixers = new Map()
 const GRID_SZ = 20 
 const GRID_CNT = 16 
+let started = false
 
 function create_ground_and_lights(scene){
   // Create Ground / Lighting
@@ -67,6 +68,16 @@ function load_model(loader,name,url,animations){
       })
     })
   })
+}
+
+function getOnScreenCoords(object,camera){
+  const width = window.innerWidth, height = window.innerHeight
+  const widthHalf = width / 2, heightHalf = height / 2
+  const pos = object.getWorldPosition(new Vector3(0,0,0))
+  pos.project( camera )
+  pos.x = ( pos.x * widthHalf ) + widthHalf
+  pos.y = - ( pos.y * heightHalf ) + heightHalf
+  return pos
 }
 
 function obj3d_from_model(name,has_skeleton){
@@ -126,7 +137,7 @@ function createEntityObject3d(eid){
       return house
     case 3:
       const pot = obj3d_from_model("pot",false)
-      addFakeShadow(pot,0.05)
+      addFakeShadow(pot,0.02)
       pot.scale.set(0.05,0.05,0.05)
       scene.add(pot)
       return pot
@@ -178,6 +189,7 @@ function spawn_start_entities(count,scene,world,entity_to_object3d){
     spawnGnome(x,z,world)
   }
   spawnPot(0,0,world)
+  started = true
 }
 
 function init(){
@@ -406,23 +418,10 @@ function init(){
     }
     event.preventDefault()
   })
-  // Mob Spawner
-  let level = 1
-  const spawnInterval = setInterval(() => {
-    // Spawn Mob
-    console.log("spawning ",Math.floor(level)," skellies")
-    for(let i=0;i<level;i++){
-      const r = 200
-      const theta = Math.random() * Math.PI * 2
-      spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
-    }
-    level += 0.1
-  },10000)
 
-  // start house button timeout
-  house_timeout()
 
   // Animation Loop
+  const cookpot_overlay = document.getElementById("cookpot_overlay")
   const animate = () => {
     const delta = clock.getDelta(); 
     for(let mixer of mixers.values()){
@@ -432,8 +431,51 @@ function init(){
   	requestAnimationFrame( animate )
     controls.update()
   	renderer.render( scene, camera )
+
+    if(started){
+      const cookpot = cookpotQuery(world)
+      if(cookpot.length){
+        const eid = cookpot[0]
+        const health = Health.h[eid]
+        const obj3d = entity_to_object3d.get(eid)
+        if(obj3d && health < 2000){
+          const pos = getOnScreenCoords(obj3d,camera)
+          cookpot_overlay.style.display = 'block'
+          cookpot_overlay.style.left = `${pos.x - 30}px`
+          cookpot_overlay.style.bottom = `${pos.y + 40}px`
+          cookpot_overlay.children[0].style.width = `${(Math.round(health/2000 *100))}%`
+        }
+      }else{
+        const gameover = document.getElementById("gameover").children[0]
+        gameover.style.display = 'block'
+        gameover.style.pointerEvents = 'auto'
+        cookpot_overlay.style.display = 'none'
+      }
+    }
   }
   animate()
+
+  // Initialize it all
+  let level = 1
+  const begin_button = document.getElementById('begin')
+  begin_button.addEventListener('click', (event) => {
+    const intro = document.getElementById('intro')
+    intro.style.display = 'none'
+
+    // BEGIN
+    const spawnInterval = setInterval(() => {
+      // Spawn Mob
+      console.log("spawning ",Math.floor(level)," skellies")
+      for(let i=0;i<level;i++){
+        const r = 200
+        const theta = Math.random() * Math.PI * 2
+        spawnMob(r*Math.sin(theta),r*Math.cos(theta),world)
+      }
+      level += 0.1
+    },10000)
+    event.preventDefault()
+    house_timeout()
+  })
 }
 
 init()

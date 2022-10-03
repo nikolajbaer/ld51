@@ -48,6 +48,7 @@ export const movementTargetQuery = defineQuery([MovementTarget,Position,Body])
 export const attackTargetQuery = defineQuery([AttackTarget])
 export const deathQuery = defineQuery([Death])
 export const mushroomHouseQuery = defineQuery([MushroomHouse])
+export const cookpotQuery = defineQuery([CookPot])
 const mobQuery = defineQuery([Mob])
 const defenderQuery = defineQuery([Defend,Not(AttackTarget)])
 
@@ -56,6 +57,18 @@ const plWorld = pl.World({})
 const Vec2 = pl.Vec2
 const plBodyMap = new Map()
 const PL_BODY_TYPES = ['kinematic','static','dynamic']
+
+const handleHit = (a,b,world) => {
+  if(hasComponent(world,Fighter,a)){
+    if(hasComponent(world,Fighter,b) && Fighter.team[a] != Fighter.team[b]){
+      addComponent(world, Hit, a)
+      Hit.v[a] = b
+    }else if(hasComponent(world,Mob,a) && hasComponent(world,CookPot,b)){
+      addComponent(world, Hit, a)
+      Hit.v[a] = b
+    }
+  }
+}
 
 export const movementSystem = (world) => {
   const { time: { delta } } = world
@@ -101,16 +114,10 @@ export const movementSystem = (world) => {
   for (let c = plWorld.getContactList(); c; c = c.getNext()) {
     const eid_a = c.getFixtureA().m_body.eid
     const eid_b = c.getFixtureB().m_body.eid
-    // if we are contacting enemies
+    // if we are contacting enemies or mobs are attacking the cook pot
     // last contact "wins"
-    if(hasComponent(world,Fighter,eid_a) && hasComponent(world,Fighter,eid_b) && Fighter.team[eid_a] != Fighter.team[eid_b]){
-      // CONSIDER do we necessarily want to attack on every contact?
-      // Or should we only attack if this is their AttackTarget?
-      addComponent(world, Hit, eid_a)
-      Hit.v[eid_a] = eid_b
-      addComponent(world, Hit, eid_b)
-      Hit.v[eid_b] = eid_a
-    }
+    handleHit(eid_a,eid_b,world)
+    handleHit(eid_b,eid_a,world)
   }
   return world
 }
@@ -362,6 +369,6 @@ export const spawnPot = (x,z,world) => {
   Body.vel[eid] = 0
   Body.r[eid] = 6
   Body.t[eid] = 1
-  Health.h[eid] = 500
+  Health.h[eid] = 2000
   return eid
 }
